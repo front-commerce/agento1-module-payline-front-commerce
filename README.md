@@ -15,3 +15,7 @@ As this packages uses code and configuration from `Monext_Payline`, this modules
 ## API
 
 Coming soon.
+
+## License
+
+[MIT](LICENSE)

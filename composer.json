@@ -1,6 +1,7 @@
 {
   "name": "front-commerce/magento1-module-payline",
   "type": "magento-module",
+  "license": "MIT",
   "authors": [
     {
       "name": "Front-Commerce",
