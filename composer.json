@@ -1,0 +1,21 @@
+{
+  "name": "front-commerce/magento1-module-payline",
+  "type": "magento-module",
+  "authors": [
+    {
+      "name": "Front-Commerce",
+      "email": "support@front-commerce.com"
+    }
+  ],
+  "minimum-stability": "dev",
+  "repositories": [
+    {
+      "type": "vcs",
+      "url": "https://gitlab.com/front-commerce/magento1-module-front-commerce"
+    }
+  ],
+  "require": {
+    "front-commerce/magento1-module": "*"
+  },
+  "version": "1.0.0"
+}
