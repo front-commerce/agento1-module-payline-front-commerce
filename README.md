@@ -1,4 +1,4 @@
-# Payling Magento 1 Front Commerce package
+# Payline Magento 1 Front Commerce package
 
 This module extend [`Monext_Payline`](https://docs.payline.com/display/DT/Plugin+Magento+1) to allow headless payments with Front-Commerce.
 
