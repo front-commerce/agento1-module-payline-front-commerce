@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<config>
+  <modules>
+    <FrontCommerce_Payline>
+      <version>1.0.0</version>
+    </FrontCommerce_Payline>
+  </modules>
+  <global>
+    <models>
+      <frontcommerce_payline>
+        <class>FrontCommerce_Payline_Model</class>
+      </frontcommerce_payline>
+    </models>
+    <helpers>
+      <frontcommerce_payline>
+        <class>FrontCommerce_Payline_Helper</class>
+      </frontcommerce_payline>
+    </helpers>
+  </global>
+</config>
