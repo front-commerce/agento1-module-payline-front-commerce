@@ -16,6 +16,10 @@ As this packages uses code and configuration from `Monext_Payline`, this modules
 
 Coming soon.
 
+## Release
+
+To release a new version, run `make release` or `make prerelease`.
+
 ## License
 
 [MIT](LICENSE)
