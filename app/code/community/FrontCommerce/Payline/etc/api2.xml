@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<config>
+  <api2>
+    <resource_groups>
+      <payline translate="title" module="frontcommerce_payline">
+        <title>Payline</title>
+        <sort_order>100</sort_order>
+      </payline>
+    </resource_groups>
+    <resources>
+      <payline_token title="title" module="frontcommerce_payline">
+        <group>payline</group>
+        <model>frontcommerce_payline/api2_payline_token</model>
+        <title>Payline checkout (headless payment)</title>
+        <sort_order>100</sort_order>
+        <privileges>
+          <customer>
+            <retrieve>1</retrieve>
+            <create>1</create>
+          </customer>
+          <guest>
+            <retrieve>1</retrieve>
+            <create>1</create>
+          </guest>
+        </privileges>
+        <attributes>
+          <token />
+        </attributes>
+        <routes>
+          <route_entity>
+            <route>frontcommerce/payline/cart/:id/token</route>
+            <action_type>entity</action_type>
+          </route_entity>
+          <route_collection_order>
+            <route>frontcommerce/payline/cart/:id/order</route>
+            <action_type>collectionOrder</action_type>
+          </route_collection_order>
+        </routes>
+        <versions>1</versions>
+      </payline_token>
+    </resources>
+  </api2>
+</config>

@@ -1,1 +1,3 @@
 app/etc/modules/FrontCommerce_Payline.xml   app/etc/modules/FrontCommerce_Payline.xml
+
+app/code/community/FrontCommerce/Payline    app/code/community/FrontCommerce/Payline
