@@ -15,16 +15,24 @@ extends FrontCommerce_Integration_Model_Api2_Abstract
 
   protected function _placeOrder($params)
   {
-    $result = $this->payline()->placeOrderFromQuoteAndPaylineToken(
+    $paylineHelper = $this->payline();
+    $paylineToken = $params['token'];
+
+    $paylineHelper->setPaylinePaymentTokenAndCreateOrder(
       $this->_getQuote(),
-      $params['token'],
+      $paylineToken,
       $this->_getCustomer()
     );
-    // ToDo: error management
 
-    // ToDo: do additional things like in cptReturn?
-    // $this->_forward('cptReturn', NULL, NULL, array('paylinetoken' => $paylineToken));
-    return $result;
+    try {
+      $result = $this->payline()->placeOrderFromPaylineToken(
+        $paylineToken,
+        $this->_getCustomer()
+      );
+      return $result;
+    } catch (\RuntimeException $e) {
+      $this->_critical($e->getMessage());
+    }
   }
 
   /**

@@ -6,6 +6,10 @@
  */
 class FrontCommerce_Payline_Helper_Duplication
 {
+  const STATUS_SUCCESS = "success";
+  const STATUS_PENDING = "pending";
+  const STATUS_ERROR = "error";
+
   /**
    * Source: Monext_Payline_Helper_Widget::getDataToken()
    */
@@ -102,11 +106,186 @@ class FrontCommerce_Payline_Helper_Duplication
     }
   }
 
+
+  /**
+   * Source: Monext_Payline_IndexController::cptReturnAction()
+   * and also parts of FrontCommerce_Integration_Model_Api2_Sales_Cart_Order::_placeOrder
+   */
+  public function placeOrderFromPaylineToken(
+    $paylineToken,
+    $customer = null
+  ) {
+    $tokenData = Mage::getModel('payline/token')->load($paylineToken, 'token')->getData();
+
+    // Order is loaded from id associated to the token
+    if (sizeof($tokenData) == 0) {
+      Mage::helper('payline/logger')->log('[cptReturnAction] - token ' . $paylineToken . ' is unknown');
+      throw new \RuntimeException('Token ' . $paylineToken . ' is unknown');
+      return;
+    }
+    $this->order = Mage::getModel('sales/order')->loadByIncrementId($tokenData['order_id']);
+
+    if (!in_array($tokenData['status'], array(0, 3))) { // order update is already done => exit this function
+      $acceptedCodes = array(
+        '00000', // Credit card -> Transaction approved
+        '02500', // Wallet -> Operation successfull
+        '02501', // Wallet -> Operation Successfull with warning / Operation Successfull but wallet will expire
+        '04003', // Fraud detected - BUT Transaction approved (04002 is Fraud with payment refused)
+        '00100',
+        '03000',
+        '34230', // signature SDD
+        '34330' // prélèvement SDD
+      );
+
+      if (in_array($tokenData['result_code'], $acceptedCodes)) {
+        return [
+          'order_id' => $this->order->getIncrementId(),
+          'result_code' => $tokenData['result_code']
+        ];
+      } else {
+        throw new \RuntimeException(Mage::helper('payline')->__('Your payment is refused'));
+      }
+    }
+
+    $tokenForUpdate = Mage::getModel('payline/token')->load($tokenData['id']);
+    $webPaymentDetails = Mage::helper('payline')->initPayline('CPT')->getWebPaymentDetails(array('token' => $paylineToken, 'version' => Monext_Payline_Helper_Data::VERSION));
+
+    $this->order->getPayment()->setAdditionalInformation('payline_payment_info', $webPaymentDetails['payment']);
+
+    $paymentStatus = static::STATUS_ERROR;
+    $userMessage = null;
+    if (isset($webPaymentDetails)) {
+      if (is_array($webPaymentDetails) and !empty($webPaymentDetails['transaction'])) {
+        if (!empty($webPaymentDetails['transaction']['id']) && Mage::helper('payline/payment')->updateOrder($this->order, $webPaymentDetails, $webPaymentDetails['transaction']['id'], 'CPT')) {
+          $paymentStatus = static::STATUS_SUCCESS;
+
+          // set order status
+          if ($webPaymentDetails['result']['code'] == '04003') {
+            // we consider that a pending risk related to the LCLF module with anti-fraud rules should still be marked as pending…
+            // even though the transaction was accepted
+            $paymentStatus = static::STATUS_PENDING;
+            $newOrderStatus = Mage::getStoreConfig('payment/payline_common/fraud_order_status');
+            Mage::helper('payline')->setOrderStatus($this->order, $newOrderStatus);
+          } else {
+            Mage::helper('payline')->setOrderStatusAccordingToPaymentMode(
+              $this->order,
+              $webPaymentDetails['payment']['action']
+            );
+          }
+
+          // update token model to flag this order as already updated and save resultCode & transactionId
+          $tokenForUpdate->setStatus(1); // OK
+          $tokenForUpdate->setTransactionId($webPaymentDetails['transaction']['id']);
+          $tokenForUpdate->setResultCode($webPaymentDetails['result']['code']);
+
+          // save wallet if created during this payment
+          if (!empty($webPaymentDetails['wallet']) and !empty($webPaymentDetails['wallet']['walletId'])) {
+            $this->saveWallet($customer, $webPaymentDetails['wallet']['walletId']);
+          } elseif (!empty($webPaymentDetails['privateDataList']) and !empty($webPaymentDetails['privateDataList']['privateData'])) {
+            $privateDataList = $webPaymentDetails['privateDataList']['privateData'];
+            if (!empty($privateDataList['key']) and !empty($privateDataList['value']) and $privateDataList['key'] == 'newWalletId') {
+              $this->saveWallet($customer, $privateDataList['value']);
+            } else {
+              foreach ($webPaymentDetails['privateDataList']['privateData'] as $privateDataList) {
+                if (is_object($privateDataList) && $privateDataList->key == 'newWalletId') {
+                  if (isset($webPaymentDetails['wallet']) && $webPaymentDetails['wallet']['walletId'] == $privateDataList->value) { // Customer may have unchecked the "Save this information for my next orders" checkbox on payment page. If so, wallet is not created !
+                    $this->saveWallet($customer, $privateDataList->value);
+                  }
+                }
+              }
+            }
+          }
+
+          // create invoice if needed
+          Mage::helper('payline')->automateCreateInvoiceAtShopReturn('CPT', $this->order);
+        } else {
+          // payment NOT OK
+          $msgLog = 'PAYMENT KO : ' . $webPaymentDetails['result']['code'] . ' ' . $webPaymentDetails['result']['shortMessage'] . ' (' . $webPaymentDetails['result']['longMessage'] . ')';
+          $tokenForUpdate->setResultCode($webPaymentDetails['result']['code']);
+
+          $pendingCodes = array(
+            '02306', // Customer has to fill his payment data
+            '02533', // Customer not redirected to payment page AND session is active
+            '02000', // transaction in progress
+            '02005', // transaction in progress
+            '02015', // transaction delegated to partner
+            '02016', // Transaction pending by the partner
+            '02017', // Transaction pending
+            paylineSDK::ERR_CODE // communication issue between Payline and the store
+          );
+
+          if (!in_array($webPaymentDetails['result']['code'], $pendingCodes)) {
+            if ($webPaymentDetails['result']['code'] == '00000') { // payment is OK, but a mismatch with order was detected
+              $paymentDataMismatchStatus = Mage::getStoreConfig('payment/payline_common/payment_mismatch_order_status');
+              $this->order->setState(Mage_Sales_Model_Order::STATE_CANCELED, $paymentDataMismatchStatus, $msgLog, false);
+            } elseif (in_array($webPaymentDetails['result']['code'], array('02304', '02324', '02534'))) {
+              $abandonedStatus = Mage::getStoreConfig('payment/payline_common/resignation_order_status');
+              $this->order->setState(Mage_Sales_Model_Order::STATE_CANCELED, $abandonedStatus, $msgLog, false);
+            } elseif ($webPaymentDetails['result']['code'] == '02319') {
+              $userMessage = Mage::helper('payline')->__('Your payment is canceled');
+              $canceledStatus = Mage::getStoreConfig('payment/payline_common/canceled_order_status');
+              $this->order->setState(Mage_Sales_Model_Order::STATE_CANCELED, $canceledStatus, $msgLog, false);
+            } else {
+              $userMessage = Mage::helper('payline')->__('Your payment is refused');
+              $failedOrderStatus = Mage::getStoreConfig('payment/payline_common/failed_order_status');
+              $this->order->setState(Mage_Sales_Model_Order::STATE_CANCELED, $failedOrderStatus, $msgLog, false);
+            }
+            $tokenForUpdate->setStatus(2); // KO
+            $paymentStatus = static::STATUS_ERROR;
+          } else {
+            $userMessage = Mage::helper('payline')->__('Your payment is saved');
+            $waitOrderStatus = Mage::getStoreConfig('payment/payline_common/wait_order_status');
+            $this->order->setState(Mage_Sales_Model_Order::STATE_PROCESSING, $waitOrderStatus, $msgLog, false);
+            $tokenForUpdate->setStatus(3); // to be determined
+            $paymentStatus = static::STATUS_PENDING;
+          }
+          Mage::helper('payline/logger')->log('[cptReturnAction] ' . $this->order->getIncrementId() . ' ' . $msgLog);
+        }
+        $tokenForUpdate->setDateUpdate(date('Y-m-d G:i:s'));
+        $tokenForUpdate->save();
+      } elseif (is_string($webPaymentDetails)) {
+        $paymentStatus = static::STATUS_ERROR;
+        Mage::helper('payline/logger')->log('[cptReturnAction] order ' . $this->order->getIncrementId() . ' - ERROR - ' . $webPaymentDetails);
+      } else {
+        $paymentStatus = static::STATUS_ERROR;
+      }
+    } else {
+      Mage::helper('payline/logger')->log('[cptReturnAction] order ' . $this->order->getIncrementId() . ' : unknown error during update');
+      throw new \RuntimeException($this->order->getIncrementId() . ': unknown error during update');
+    }
+
+    $this->order->save();
+    return [
+      'order_id' => $this->order->getIncrementId(),
+      'result_code' => $webPaymentDetails['result']['code'],
+      'transaction_id' => $webPaymentDetails['transaction']['id'],
+      'status' => $paymentStatus,
+      'message' => $userMessage,
+    ];
+  }
+
+  /**
+   * Check if the customer is logged, and if it has a wallet
+   * If not & if there is a walletId in the result from Payline, we save it
+   */
+  private function saveWallet($customer, $walletId)
+  {
+    if (!Mage::getStoreConfig('payment/payline_common/automate_wallet_subscription')) {
+      return;
+    }
+    // ToDo: handle guest checkout
+    // if ($customerSession->isLoggedIn()) {
+    if (!$customer->getWalletId()) {
+      $customer->setWalletId($walletId);
+      $customer->save();
+    }
+  }
+
   /**
    * Source: Monext_Payline_IndexController::cptReturnWidgetAction()
    * and also parts of FrontCommerce_Integration_Model_Api2_Sales_Cart_Order::_placeOrder
    */
-  public function placeOrderFromQuoteAndPaylineToken(
+  public function setPaylinePaymentTokenAndCreateOrder(
     $quote,
     $paylineToken,
     $customer = null
@@ -154,8 +333,7 @@ class FrontCommerce_Payline_Helper_Duplication
           // Incorrect order_id
           throw new Exception('Quote getReservedOrderId (' . $quote->getReservedOrderId() . ') do not match tokenData (' . $orderIncrementId . ') for quoteId:' . $quote->getId());
         }
-      } elseif (!$this->getRequest()->getParam('paylineshortcut')) {
-        // Order should not be created exept from shortcut
+      } else {
         throw new Exception('Order already exist for ' . $orderIncrementId);
       }
     } catch (Exception $e) {
