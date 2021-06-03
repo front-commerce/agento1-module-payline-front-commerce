@@ -39,9 +39,7 @@ class FrontCommerce_Payline_Helper_Duplication
       //   //                    $array['secondContracts'] = array('');
       // }
 
-      $fcBaseUrl = Mage::helper('frontcommerce_integration')
-        ->getFrontCommerceUrl(Mage::app()->getStore());
-      $fcBaseUrl = trim($fcBaseUrl, '/');
+      $fcBaseUrl = $this->__getStoreUrl();
 
       $paylineSDK = Mage::helper('payline')->initPayline('CPT', $array['payment']['currency']);
       $paylineSDK->returnURL          = $fcBaseUrl . '/payline/process/widget';
@@ -106,6 +104,11 @@ class FrontCommerce_Payline_Helper_Duplication
     }
   }
 
+  private function __getStoreUrl()
+  {
+    $fcBaseUrl = Mage::app()->getStore()->getUrl();
+    return trim($fcBaseUrl, '/');
+  }
 
   /**
    * Source: Monext_Payline_IndexController::cptReturnAction()
