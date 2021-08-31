@@ -55,8 +55,8 @@ class FrontCommerce_Payline_Helper_Duplication
       if (Mage::getStoreConfig('payment/PaylineCPT/send_wallet_id')) {
 
         if (!isset($array['buyer']['walletId'])) {
-          if (isset($this->walletId)) {
-            $array['buyer']['walletId'] = $this->walletId;
+          if (isset($helperPayline->walletId)) {
+            $array['buyer']['walletId'] = $helperPayline->walletId;
           }
         }
 
@@ -69,18 +69,18 @@ class FrontCommerce_Payline_Helper_Duplication
         }
 
         if ($expiredWalletId) {
-          $this->walletId = null;
+          $helperPayline->walletId = null;
         }
 
         if ($helperPayline->canSubscribeWallet()) {
           // If the wallet is new (registered during payment), we must
           // save it in the private data since it's not sent back by
           // default
-          if ($this->isNewWallet) {
-            if ($this->walletId) {
+          if ($helperPayline->isNewWallet) {
+            if ($helperPayline->walletId) {
               $paylineSDK->setPrivate(array(
                 'key' => 'newWalletId',
-                'value' => $this->walletId
+                'value' => $helperPayline->walletId
               ));
             }
           }
