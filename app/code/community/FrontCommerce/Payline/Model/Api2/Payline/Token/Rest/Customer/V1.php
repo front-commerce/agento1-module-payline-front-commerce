@@ -21,13 +21,13 @@ extends FrontCommerce_Integration_Model_Api2_Abstract
     $paylineHelper->setPaylinePaymentTokenAndCreateOrder(
       $this->_getQuote(),
       $paylineToken,
-      $this->_getCustomer()
+      $this->getCustomer()
     );
 
     try {
       $result = $this->payline()->placeOrderFromPaylineToken(
         $paylineToken,
-        $this->_getCustomer()
+        $this->getCustomer()
       );
       return $result;
     } catch (\RuntimeException $e) {
@@ -91,7 +91,7 @@ extends FrontCommerce_Integration_Model_Api2_Abstract
   protected function _getQuote($quoteIdEncrypt = null)
   {
     if (!$this->_quote) {
-      $this->_getCustomer();
+      $this->getCustomer();
       $this->_quote    = Mage::getModel('sales/quote')->setStore($this->_getStore())->loadByCustomer($this->_customer);
       if (!$this->_quote || !$this->_quote->getId()) {
         $this->_critical(self::RESOURCE_REQUEST_DATA_INVALID, null, false);
@@ -100,25 +100,6 @@ extends FrontCommerce_Integration_Model_Api2_Abstract
     }
     $this->_updateQuoteCurrency();
     return $this->_quote;
-  }
-
-
-  /**
-   * ToDo: from src/.modman/magento1-module/app/code/community/FrontCommerce/Integration/Model/Api2/Sales/Cart/Rest/Customer/V1.php
-   */
-  protected function _getCustomer()
-  {
-    if (!$this->_customer) {
-      if (!$customerId = $this->getApiUser()->getUserId()) {
-        $this->_critical(self::RESOURCE_NOT_FOUND);
-      }
-      $customer      = Mage::getModel('customer/customer')->load($customerId);
-      if (!$customer || !$customer->getId()) {
-        $this->_critical(self::RESOURCE_REQUEST_DATA_INVALID);
-      }
-      $this->_customer = $customer;
-    }
-    return $this->_customer;
   }
 
   /**
