@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.2.2](https://github.com/front-commerce/magento1-module-payline-front-commerce/compare/1.2.1...1.2.2) (2021-10-13)
+
+
+### Bug Fixes
+
+* **wallet:** use correct class properties for wallet ([51b4f5d](https://github.com/front-commerce/magento1-module-payline-front-commerce/commit/51b4f5dd810209d01994df0cf13bd2b9ed54a698))
+
 ### [1.2.1](https://github.com/front-commerce/magento1-module-payline-front-commerce/compare/1.2.0...1.2.1) (2021-06-03)
 
 
