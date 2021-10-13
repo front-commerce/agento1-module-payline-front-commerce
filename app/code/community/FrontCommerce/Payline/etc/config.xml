@@ -17,4 +17,10 @@
       </frontcommerce_payline>
     </helpers>
   </global>
+
+  <frontcommerce>
+    <configuration_acl>
+      <payment_payline_common_environment>payment/payline_common/environment</payment_payline_common_environment>
+    </configuration_acl>
+  </frontcommerce>
 </config>
