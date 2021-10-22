@@ -44,7 +44,6 @@ class FrontCommerce_Payline_Helper_Duplication
       $paylineSDK = Mage::helper('payline')->initPayline('CPT', $array['payment']['currency']);
       $paylineSDK->returnURL          = $fcBaseUrl . '/payline/process/widget';
       $paylineSDK->cancelURL          = $paylineSDK->returnURL;
-      $paylineSDK->notificationURL    = $paylineSDK->returnURL;
 
       // WALLET
       // ADD CONTRACT WALLET ARRAY TO $array
